@@ -245,35 +245,76 @@ int computeUpperBoundBFS(const Board &board)
 
 //     // generate all possible valid moves from this state
 // }
-// void dfs(Board board, int lower_bound, int upperBound) {
-//     // Check termination conditions
-//     if (/* Termination condition based on lower bound */ || /* Termination condition based on upper bound */) {
-//         // Handle termination
-//         return;
-//     }
+void dfs(Board board, int lower_bound, int upperBound)
+{
+    // Check termination conditions
+    if (lower_bound >= upperBound)
+    {
+        // Prune the branch if lower bound exceeds upper bound
+        return;
+    }
 
-//     // Calculate lower bound for the current state
-//     // Update lower bound for subsequent states
+    // Calculate lower bound for the current state
+    int current_lower_bound = computeLowerBoundBFS(board);
 
-//     // Generate all possible moves for white knight
-//     // Calculate lower bounds for resulting states
-//     // Prune branches based on upper bound
+    // Update lower bound for subsequent states
+    lower_bound = max(lower_bound, current_lower_bound);
 
-//     // Generate all possible moves for black knight
-//     // Calculate lower bounds for resulting states
-//     // Prune branches based on upper bound
+    // Generate all possible moves for white knight
+    for (/* Each possible move of white knight */)
+    {
+        // Make the move
+        // Update board state
 
-//     // Recursively explore remaining moves
-// }
+        // Calculate lower bounds for resulting states
+        int new_lower_bound = computeLowerBoundBFS(board);
 
-// int solve(Board board)
-// {
-//     // Compute the lower bound
-//     int lowerBound = computeLowerBoundBFS(board);
-//     // Compute the upper bound
-//     int upperBound = computeUpperBoundBFS(board);
-//     int bb_DFS(board, lower_bound, upperBound);
-// }
+        // Prune branches based on upper bound
+        if (lower_bound + new_lower_bound + 1 >= upperBound)
+        {
+            // Prune this branch
+            continue;
+        }
+
+        // Recursively explore the move
+        dfs(board, lower_bound, upperBound);
+
+        // Undo the move
+        // Restore board state
+    }
+
+    // Generate all possible moves for black knight
+    for (/* Each possible move of black knight */)
+    {
+        // Make the move
+        // Update board state
+
+        // Calculate lower bounds for resulting states
+        int new_lower_bound = computeLowerBoundBFS(board);
+
+        // Prune branches based on upper bound
+        if (lower_bound + new_lower_bound + 1 >= upperBound)
+        {
+            // Prune this branch
+            continue;
+        }
+
+        // Recursively explore the move
+        dfs(board, lower_bound, upperBound);
+
+        // Undo the move
+        // Restore board state
+    }
+}
+
+int solve(Board board)
+{
+    // Compute the lower bound
+    int lowerBound = computeLowerBoundBFS(board);
+    // Compute the upper bound
+    int upperBound = computeUpperBoundBFS(board);
+    int bb_DFS(board, lower_bound, upperBound);
+}
 int main()
 {
     string filename = "in_0017.txt";
