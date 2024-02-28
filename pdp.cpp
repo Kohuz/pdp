@@ -5,6 +5,7 @@
 #include <climits>
 #include <cmath>
 #include <queue>
+#include <algorithm>
 #include <stack>
 
 using namespace std;
@@ -29,6 +30,10 @@ struct Board
     Rectangle white;
     Rectangle black;
 };
+int dx[] = {2, 1, -1, -2, -2, -1, 1, 2};
+int dy[] = {1, 2, 2, 1, -1, -2, -2, -1};
+
+int recursionCounter = 0;
 
 Board createBoard(int m, int n, const Rectangle &white, const Rectangle &black)
 {
@@ -88,9 +93,6 @@ int bfs(const Board &board, int startX, int startY, Rectangle targetArea)
     // Mark the starting point as visited and enqueue it
     visited[startX * board.n + startY] = true;
     q.push({startX, startY, 0});
-    // Define possible moves for a knight (L-shape)
-    int dx[] = {2, 1, -1, -2, -2, -1, 1, 2};
-    int dy[] = {1, 2, 2, 1, -1, -2, -2, -1};
     // Run BFS
     while (!q.empty())
     {
@@ -159,8 +161,6 @@ int upperBoundBFS(const Board &board, int startX, int startY, Rectangle targetAr
                 // Mark the new cell as visited and enqueue it with depth incremented by 1
                 visited[newX * board.n + newY] = true;
                 q.push({newX, newY, p.depth + 1});
-                // Print the move chosen by the BFS
-                cout << "Move: (" << p.x << ", " << p.y << ") -> (" << newX << ", " << newY << ")" << endl;
             }
         }
     }
@@ -184,7 +184,6 @@ int computeLowerBoundBFS(const Board &board)
             int closestMoves = INT_MAX;
             int moves = bfs(board, knightRow, knightCol, board.black);
             closestMoves = min(closestMoves, moves);
-            cout << "Closest moves for white knight at (" << knightRow << ", " << knightCol << "): " << closestMoves << endl;
             lowerBound += closestMoves;
         }
         if (board.boardState[i] == 'B')
@@ -195,7 +194,6 @@ int computeLowerBoundBFS(const Board &board)
             int closestMoves = INT_MAX;
             int moves = bfs(board, knightRow, knightCol, board.white);
             closestMoves = min(closestMoves, moves);
-            cout << "Closest moves for black knight at (" << knightRow << ", " << knightCol << "): " << closestMoves << endl;
             lowerBound += closestMoves;
         }
     }
@@ -216,7 +214,6 @@ int computeUpperBoundBFS(const Board &board)
             int farthestMoves = 0;
             int moves = upperBoundBFS(board, knightRow, knightCol, board.black);
             farthestMoves = max(farthestMoves, moves);
-            cout << "Farthest moves for white knight at (" << knightRow << ", " << knightCol << "): " << farthestMoves << endl;
             upperBound += farthestMoves;
         }
         if (board.boardState[i] == 'B')
@@ -227,97 +224,136 @@ int computeUpperBoundBFS(const Board &board)
             int farthestMoves = 0;
             int moves = upperBoundBFS(board, knightRow, knightCol, board.white);
             farthestMoves = max(farthestMoves, moves);
-            cout << "Farthest moves for black knight at (" << knightRow << ", " << knightCol << "): " << farthestMoves << endl;
             upperBound += farthestMoves;
         }
     }
     return upperBound;
 }
-// int bb_DFS(Board board, int lower_bound, int upperBound)
-// {
-//     // Create a visited array to mark visited cells using 1D array
-//     vector<bool> visited(board.m * board.n, false);
-//     // Create a stack for DFS
-//     stack<vector<char>> s;
-//     // Mark the starting point as visited and push it
-//     visited[startX * board.n + startY] = true;
-//     s.push({startX, startY, 0});
 
-//     // generate all possible valid moves from this state
-// }
-void dfs(Board board, int lower_bound, int upperBound)
+bool isSolution(Board board)
 {
-    // Check termination conditions
-    if (lower_bound >= upperBound)
+    for (int i = 0; i < board.m * board.n; ++i)
     {
-        // Prune the branch if lower bound exceeds upper bound
+        if (board.boardState[i] == 'W')
+        {
+            int knightRow = i / board.n;
+            int knightCol = i % board.n;
+            if (!isInTargetArea(knightRow, knightCol, board.black))
+            {
+                return false;
+            }
+        }
+        if (board.boardState[i] == 'B')
+        {
+            int knightRow = i / board.n;
+            int knightCol = i % board.n;
+            if (!isInTargetArea(knightRow, knightCol, board.white))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+void dfs(Board board, int currentDepth, int &bestDepth, bool isWhiteTurn)
+{
+    if (recursionCounter % 100000 == 0)
+    {
+        cout << "Recursion counter: " << recursionCounter << endl;
+    }
+    recursionCounter++;
+    int currentLowerBound = computeLowerBoundBFS(board);
+
+    // test if current depth + current lower bound >= bestDepth
+    if (currentDepth + currentLowerBound >= bestDepth)
+    {
         return;
     }
-
-    // Calculate lower bound for the current state
-    int current_lower_bound = computeLowerBoundBFS(board);
-
-    // Update lower bound for subsequent states
-    lower_bound = max(lower_bound, current_lower_bound);
-
-    // Generate all possible moves for white knight
-    for (/* Each possible move of white knight */)
+    if (isSolution(board) && currentDepth < bestDepth)
     {
-        // Make the move
-        // Update board state
-
-        // Calculate lower bounds for resulting states
-        int new_lower_bound = computeLowerBoundBFS(board);
-
-        // Prune branches based on upper bound
-        if (lower_bound + new_lower_bound + 1 >= upperBound)
-        {
-            // Prune this branch
-            continue;
-        }
-
-        // Recursively explore the move
-        dfs(board, lower_bound, upperBound);
-
-        // Undo the move
-        // Restore board state
+        bestDepth = currentDepth;
+        return;
     }
-
-    // Generate all possible moves for black knight
-    for (/* Each possible move of black knight */)
+    vector<Board> validMoves;
+    // if it is white turn generate all valid moves for white from the current state
+    if (isWhiteTurn)
     {
-        // Make the move
-        // Update board state
-
-        // Calculate lower bounds for resulting states
-        int new_lower_bound = computeLowerBoundBFS(board);
-
-        // Prune branches based on upper bound
-        if (lower_bound + new_lower_bound + 1 >= upperBound)
+        for (int i = 0; i < board.m * board.n; ++i)
         {
-            // Prune this branch
-            continue;
+            if (board.boardState[i] == 'W')
+            {
+                int knightRow = i / board.n;
+                int knightCol = i % board.n;
+                // Compute all possible valid chess moves for the white knight and store them in a vector
+                for (int j = 0; j < 8; ++j)
+                {
+                    int newX = knightRow + dx[j];
+                    int newY = knightCol + dy[j];
+                    if (isInBoard(newX, newY, board) && board.boardState[newX * board.n + newY] == '-')
+                    {
+                        Board newBoard = board;
+                        newBoard.boardState[i] = '-';
+                        newBoard.boardState[newX * board.n + newY] = 'W';
+                        validMoves.push_back(newBoard);
+                    }
+                }
+            }
         }
+    }
+    else
+    {
+        for (int i = 0; i < board.m * board.n; ++i)
+        {
+            if (board.boardState[i] == 'B')
+            {
+                int knightRow = i / board.n;
+                int knightCol = i % board.n;
+                // Compute all possible valid chess moves for the white knight and store them in a vector
+                for (int j = 0; j < 8; ++j)
+                {
+                    int newX = knightRow + dx[j];
+                    int newY = knightCol + dy[j];
+                    if (isInBoard(newX, newY, board) && board.boardState[newX * board.n + newY] == '-')
+                    {
+                        Board newBoard = board;
+                        newBoard.boardState[i] = '-';
+                        newBoard.boardState[newX * board.n + newY] = 'B';
+                        validMoves.push_back(newBoard);
+                    }
+                }
+            }
+        }
+    }
+    // Sort the valid moves based on the lower bound from the lowest to the highest
+    sort(validMoves.begin(), validMoves.end(), [](const Board &a, const Board &b)
+         { return computeLowerBoundBFS(a) < computeLowerBoundBFS(b); });
 
-        // Recursively explore the move
-        dfs(board, lower_bound, upperBound);
+    // Call the dfs function recursively for each valid move
+    for (int i = 0; i < validMoves.size(); ++i)
+    {
+        if (isWhiteTurn)
+        {
 
-        // Undo the move
-        // Restore board state
+            dfs(validMoves[i], currentDepth + 1, bestDepth, false);
+        }
+        else
+        {
+            dfs(validMoves[i], currentDepth + 1, bestDepth, true);
+        }
     }
 }
 
 int solve(Board board)
 {
-    // Compute the lower bound
-    int lowerBound = computeLowerBoundBFS(board);
-    // Compute the upper bound
     int upperBound = computeUpperBoundBFS(board);
-    int bb_DFS(board, lower_bound, upperBound);
+    int bestDepth = upperBound + 1; // Initialize the best depth with the upper bound
+    dfs(board, 0, bestDepth, true); // Call the depth-first search function
+    return bestDepth;               // Return the best depth found
 }
+
 int main()
 {
-    string filename = "in_0017.txt";
+    string filename = "in_0016.txt";
     ifstream file(filename);
 
     if (!file.is_open())
@@ -344,8 +380,10 @@ int main()
     int lowerBoundBFS = computeLowerBoundBFS(board);
     cout << "Lower bound using BFS: " << lowerBoundBFS << endl;
     cout << "Upper bound using BFS: " << computeUpperBoundBFS(board) << endl;
-    // int result = solve(board);
 
+    int bestDepth = solve(board); // Call the solve function to find the best depth
+    cout << "Best depth found: " << bestDepth << endl;
+    cout << "Recursion counter: " << recursionCounter << endl;
     file.close();
     return 0;
 }
