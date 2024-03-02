@@ -84,7 +84,7 @@ bool isInTargetArea(int x, int y, Rectangle targetArea)
     return x >= targetArea.x1 && x <= targetArea.x2 && y >= targetArea.y1 && y <= targetArea.y2;
 }
 
-int bfs(const Board &board, int startX, int startY, Rectangle targetArea)
+int lowerBoundBFS(const Board &board, int startX, int startY, Rectangle targetArea)
 {
     // Create a visited array to mark visited cells using 1D array
     vector<bool> visited(board.m * board.n, false);
@@ -131,9 +131,6 @@ int upperBoundBFS(const Board &board, int startX, int startY, Rectangle targetAr
     // Mark the starting point as visited and enqueue it
     visited[startX * board.n + startY] = true;
     q.push({startX, startY, 0});
-    // Define possible moves for a knight (L-shape)
-    int dx[] = {2, 1, -1, -2, -2, -1, 1, 2};
-    int dy[] = {1, 2, 2, 1, -1, -2, -2, -1};
     // Initialize variables to track the furthest cell found and its depth
     Point furthestCell = {startX, startY, 0};
     int maxDepth = 0;
@@ -182,7 +179,7 @@ int computeLowerBoundBFS(const Board &board)
             int knightCol = i % board.n;
             // Compute the number of moves to reach the closest board.black cell
             int closestMoves = INT_MAX;
-            int moves = bfs(board, knightRow, knightCol, board.black);
+            int moves = lowerBoundBFS(board, knightRow, knightCol, board.black);
             closestMoves = min(closestMoves, moves);
             lowerBound += closestMoves;
         }
@@ -192,7 +189,7 @@ int computeLowerBoundBFS(const Board &board)
             int knightCol = i % board.n;
             // Compute the number of moves to reach the closest board.white cell
             int closestMoves = INT_MAX;
-            int moves = bfs(board, knightRow, knightCol, board.white);
+            int moves = lowerBoundBFS(board, knightRow, knightCol, board.white);
             closestMoves = min(closestMoves, moves);
             lowerBound += closestMoves;
         }
@@ -253,28 +250,81 @@ bool isSolution(Board board)
             }
         }
     }
+
     return true;
 }
-void dfs(Board board, int currentDepth, int &bestDepth, bool isWhiteTurn)
+vector<vector<char>> bestMoveSequence; // Global variable to store the best move sequence
+
+void dfs(Board &board, int currentDepth, int &bestDepth, bool isWhiteTurn, vector<vector<char>> &moveSequence)
 {
     if (recursionCounter % 100000 == 0)
     {
         cout << "Recursion counter: " << recursionCounter << endl;
     }
     recursionCounter++;
+
     int currentLowerBound = computeLowerBoundBFS(board);
 
-    // test if current depth + current lower bound >= bestDepth
+    if (isSolution(board) && currentDepth < bestDepth)
+    {
+        bestDepth = currentDepth;
+        bestMoveSequence = moveSequence;
+        cout << "Best depth updated: " << bestDepth << endl;
+        return;
+    }
+
     if (currentDepth + currentLowerBound >= bestDepth)
     {
         return;
     }
-    if (isSolution(board) && currentDepth < bestDepth)
+
+    // Check if all white knights are in the black target area
+    bool allWhiteInBlackTarget = true;
+    for (int i = 0; i < board.m * board.n; ++i)
     {
-        bestDepth = currentDepth;
+        if (board.boardState[i] == 'W')
+        {
+            int knightRow = i / board.n;
+            int knightCol = i % board.n;
+            if (!isInTargetArea(knightRow, knightCol, board.black))
+            {
+                allWhiteInBlackTarget = false;
+                break;
+            }
+        }
+    }
+
+    // Call with the opposite turn if all white knights are in the black target area
+    if (allWhiteInBlackTarget && isWhiteTurn)
+    {
+        dfs(board, currentDepth, bestDepth, false, moveSequence);
         return;
     }
+
+    // Check if all black knights are in the white target area
+    bool allBlackInWhiteTarget = true;
+    for (int i = 0; i < board.m * board.n; ++i)
+    {
+        if (board.boardState[i] == 'B')
+        {
+            int knightRow = i / board.n;
+            int knightCol = i % board.n;
+            if (!isInTargetArea(knightRow, knightCol, board.white))
+            {
+                allBlackInWhiteTarget = false;
+                break;
+            }
+        }
+    }
+    // Call with the opposite turn if all black knights are in the white target area
+    if (allBlackInWhiteTarget && !isWhiteTurn)
+    {
+        dfs(board, currentDepth, bestDepth, true, moveSequence);
+        return;
+    }
+
     vector<Board> validMoves;
+
     // if it is white turn generate all valid moves for white from the current state
     if (isWhiteTurn)
     {
@@ -327,18 +377,20 @@ void dfs(Board board, int currentDepth, int &bestDepth, bool isWhiteTurn)
     // Sort the valid moves based on the lower bound from the lowest to the highest
     sort(validMoves.begin(), validMoves.end(), [](const Board &a, const Board &b)
          { return computeLowerBoundBFS(a) < computeLowerBoundBFS(b); });
-
     // Call the dfs function recursively for each valid move
     for (int i = 0; i < validMoves.size(); ++i)
     {
         if (isWhiteTurn)
         {
-
-            dfs(validMoves[i], currentDepth + 1, bestDepth, false);
+            moveSequence.push_back(validMoves[i].boardState);
+            dfs(validMoves[i], currentDepth + 1, bestDepth, false, moveSequence);
+            moveSequence.pop_back();
         }
         else
         {
-            dfs(validMoves[i], currentDepth + 1, bestDepth, true);
+            moveSequence.push_back(validMoves[i].boardState);
+            dfs(validMoves[i], currentDepth + 1, bestDepth, true, moveSequence);
+            moveSequence.pop_back();
         }
     }
 }
@@ -346,14 +398,32 @@ void dfs(Board board, int currentDepth, int &bestDepth, bool isWhiteTurn)
 int solve(Board board)
 {
     int upperBound = computeUpperBoundBFS(board);
-    int bestDepth = upperBound + 1; // Initialize the best depth with the upper bound
-    dfs(board, 0, bestDepth, true); // Call the depth-first search function
-    return bestDepth;               // Return the best depth found
+    int bestDepth = upperBound + 1;
+    vector<vector<char>> moveSequence;
+    dfs(board, 0, bestDepth, true, moveSequence);
+    cout << "Best move sequence: " << endl;
+    cout << "Length: " << bestMoveSequence.size() << endl;
+
+    // Print the best move sequence
+    for (int i = 0; i < bestMoveSequence.size(); ++i)
+    {
+        for (int j = 0; j < board.m; ++j)
+        {
+            for (int k = 0; k < board.n; ++k)
+            {
+                cout << bestMoveSequence[i][j * board.n + k] << ' ';
+            }
+            cout << endl;
+        }
+        cout << endl;
+        cout << "====================" << endl;
+    }
+    return bestDepth;
 }
 
 int main()
 {
-    string filename = "in_0016.txt";
+    string filename = "in_0012.txt";
     ifstream file(filename);
 
     if (!file.is_open())
